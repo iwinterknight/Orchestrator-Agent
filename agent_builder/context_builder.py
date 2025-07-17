@@ -1,12 +1,8 @@
 import uuid
-from dataclasses import dataclass, asdict, field
-from typing import List, Optional, Dict, Any
+from dataclasses import dataclass, field
+from typing import Optional, Dict, Any
 
-from agent_builder.agent_factory import AgentContext
-from agent_builder.goal_builder import GoalItem
-from agent_builder.memory_builder import Memory
 from agent_builder.resource_registry import ResourceRegistry
-from agent_builder.tools_factory import ToolsFactory
 from utils.llm_api import infer_llm_json
 from utils.prompt_store import PromptStore
 
@@ -14,7 +10,7 @@ from utils.prompt_store import PromptStore
 @dataclass
 class TurnContext:
     id: uuid.UUID
-    name: str = ""
+    task: str = ""
     execution_choices: Dict[str, Any] = field(default_factory=dict)
     reasoning: str = ""
 
@@ -29,6 +25,7 @@ def normalize_turn_context(raw: Any) -> Dict[str, Any]:
             "reasoning": d.get("reasoning", ""),
             "name": d.get("name", "")
         }
+
     if any(k in raw for k in ("execution_choices", "reasoning", "name")):
         return extract_fields(raw)
 
@@ -39,13 +36,15 @@ def normalize_turn_context(raw: Any) -> Dict[str, Any]:
     raise ValueError(f"Could not normalize turn context from LLM output: {raw!r}")
 
 
+# noinspection PyTypeChecker
 class ContextBuilder:
     def __init__(self, prompt_store: Optional[PromptStore] = None):
-        turn_context_id = uuid.uuid4()
-        self.turn_context: TurnContext(id=turn_context_id)
+        self.turn_context_id = uuid.uuid4()
         self.prompt_store = prompt_store or PromptStore()
+        self.turn_context: TurnContext = None
 
-    def build_turn_context(self, task: str, resources: ResourceRegistry = None, next_step: Dict[str, Any] = None) -> TurnContext:
+    def build_turn_context(self, task: str, resources: ResourceRegistry = None, next_step: Dict[str, Any] = None) -> \
+    Dict[str, Any]:
         prompt_values = {
             "task": task,
             "next step": next_step,
@@ -54,5 +53,15 @@ class ContextBuilder:
         }
 
         agent_context_builder_prompt = self.prompt_store.get_prompt("agent_context_builder_instruction",
-                                                                     **prompt_values)
+                                                                    **prompt_values)
         raw = infer_llm_json(agent_context_builder_prompt)
+        updated_turn_context = normalize_turn_context(raw)
+
+        self.turn_context = TurnContext(
+            id=self.turn_context_id,
+            task=task,
+            execution_choices=updated_turn_context.get("execution_choices", {}),
+            reasoning=updated_turn_context.get("reasoning", "")
+        )
+
+        return self.turn_context.execution_choices

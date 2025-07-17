@@ -11,7 +11,7 @@ from utils.prompt_store import PromptStore
 @dataclass
 class ProgressReport:
     id: uuid.UUID
-    name: str = ""
+    task: str = ""
     short_term_memory: str = ""
     long_term_memory: str = ""
     progress: Dict[str, Any] = field(default_factory=dict)
@@ -76,11 +76,11 @@ class ProgressFactory:
 
         self.progress_report = ProgressReport(
             id=self.progress_report.id,
-            name=self.progress_report.name,
+            task=task,
             short_term_memory=updated_progress["short_term_memory"],
             long_term_memory=updated_progress["long_term_memory"],
             progress=updated_progress["progress"],
             next_step=updated_progress["next_step"]
         )
 
-        return updated_progress["next_step"]
+        return self.progress_report["next_step"]
