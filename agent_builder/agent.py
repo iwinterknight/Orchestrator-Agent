@@ -1,16 +1,16 @@
 import json
 import uuid
-import time
 from collections import Counter
 from enum import Enum
-from typing import List, Dict, Callable, Any
+from typing import Dict, Callable, Any
 
 from agent_builder.agent_factory import AgentCard, AgentContext
-from agent_builder.agent_language_builder import Prompt, GoalItem, AgentLanguage
-from agent_builder.environment_builder import Environment
-from agent_builder.goal_builder import GoalFactory
-from agent_builder.memory_builder import Memory
+from agent_builder.agent_language_builder import Prompt, AgentLanguage
 from agent_builder.context_builder import ContextBuilder, TurnContext
+from agent_builder.environment_builder import Environment
+from agent_builder.feedback_builder import FeedbackBuilder
+from agent_builder.memory_builder import Memory
+from agent_builder.plan_builder import PlanBuilder, Plan
 from agent_builder.resource_registry import ResourceRegistry, ToolContext
 from agent_builder.tools_factory import ToolsFactory
 from utils.llm_api import infer_llm_tool_selection, infer_llm_task_routing
@@ -25,11 +25,10 @@ class AgentRole(Enum):
 
 
 def prompt_adaptor(tools_factory: ToolsFactory, task="routing") -> Callable[[Prompt], Dict[str, Any]]:
-
     def tool_selection_adaptor(prompt: Prompt) -> Dict:
         return infer_llm_tool_selection(
             task=prompt.task,
-            goals=prompt.goals,
+            plan=prompt.plan,
             memory=prompt.memory,
             tools_factory=tools_factory,
             turn_context=prompt.turn_context
@@ -38,7 +37,7 @@ def prompt_adaptor(tools_factory: ToolsFactory, task="routing") -> Callable[[Pro
     def routing_adaptor(prompt: Prompt) -> Dict:
         return infer_llm_task_routing(
             task=prompt.task,
-            goals=prompt.goals,
+            plan=prompt.plan,
             memory=prompt.memory,
             tools=prompt.tools,
             agents=prompt.agents,
@@ -51,7 +50,6 @@ def prompt_adaptor(tools_factory: ToolsFactory, task="routing") -> Callable[[Pro
 class Agent:
     def __init__(self,
                  agent_card: AgentCard,
-                 goals: List[GoalItem],
                  agent_language: AgentLanguage,
                  resources: ResourceRegistry,
                  generate_response_routing: Callable[[Prompt], Dict[str, Any]],
@@ -62,7 +60,6 @@ class Agent:
         self.prompt_store = PromptStore()
         self.agent_id = uuid.uuid4()
         self.agent_card = agent_card
-        self.goals = goals
         self.agent_language = agent_language
         self.resources = resources
         self.environment = environment
@@ -73,14 +70,12 @@ class Agent:
         self.agent_context = None
         self.__create_agent_context()
 
-
     def __create_agent_context(self):
         agent_properties = {
             "id": self.agent_id,
             "agent_card": self.agent_card,
         }
         self.agent_context = AgentContext(properties=agent_properties, memory=Memory(), invoke=self.run)
-
 
     def __update_agent_memory(self, updated_memory: Memory):
         agent_properties = {
@@ -92,16 +87,16 @@ class Agent:
 
         self.agent_context = AgentContext(properties=agent_properties, memory=updated_memory, invoke=self.run)
 
-
-    def construct_prompt_for_resource_selection(self, task: str, goals: List[GoalItem], memory: Memory,
-                                                resources: ResourceRegistry, inject_prompt_instruction: str = None, schema: Dict = None, turn_context: TurnContext = None) -> Prompt:
+    def construct_prompt_for_resource_selection(self, task: str, plan: Plan, memory: Memory,
+                                                resources: ResourceRegistry, inject_prompt_instruction: str = None,
+                                                schema: Dict = None, turn_context: TurnContext = None) -> Prompt:
         return self.agent_language.construct_prompt(
             task=task,
             tools=resources.get_tools(),
             agents=resources.get_agents(),
             inject_prompt_instruction=inject_prompt_instruction,
             environment=self.environment,
-            goals=goals,
+            plan=plan,
             memory=memory,
             tool_context=self.tool_context,
             schema=schema,
@@ -174,16 +169,20 @@ class Agent:
     def run(self, task: str, memory=None, max_iterations: int = 50) -> Memory:
         self.set_current_task(task=task, memory=memory)
 
-        goal_factory = GoalFactory()
         invocations_counter = Counter()
+        plan_builder = PlanBuilder()
         context_builder = ContextBuilder()
-        context_builder = ContextBuilder()
+        feedback_builder = FeedbackBuilder()
+        turn_feedback, turn_action, turn_observation = None, None, None
 
         for _ in range(max_iterations):
             print("Agent thinking...")
 
+            plan = plan_builder.build_plan(task=task, feedback=turn_feedback, resources=self.resources, memory=memory)
             turn_context = context_builder.build_turn_context(task=task, memory=memory)
-            routing_prompt = self.construct_prompt_for_resource_selection(task=task, goals=self.goals, memory=memory, resources=self.resources, turn_context=turn_context)
+            routing_prompt = self.construct_prompt_for_resource_selection(task=task, plan=plan, memory=memory,
+                                                                          resources=self.resources,
+                                                                          turn_context=turn_context)
             routing_response = self.prompt_llm_for_routing(prompt=routing_prompt)
             if routing_response:
                 if "reframed_task" in routing_response and routing_response["reframed_task"]:
@@ -205,6 +204,8 @@ class Agent:
                         'task': reframed_task
                     }
                     self.update_memory(memory=memory, invocation=invocation, result=agent_response)
+                    turn_action = invocation
+                    turn_observation = agent_response
                 elif "type" in routing_response and routing_response["type"] == "tool":
                     if "terminate" in routing_response["name"]:
                         reframed_task = routing_response["name"]
@@ -223,11 +224,17 @@ class Agent:
                         except Exception as e:
                             result = f"Failed to execute tool: {e}"
                         self.update_memory(memory=memory, invocation=invocation, result=result)
+                        turn_action = invocation
+                        turn_observation = result
                     else:
-                        self.update_memory(memory=memory, response=json.dumps(selection_response))
+                        json_selection_response = json.dumps(selection_response)
+                        self.update_memory(memory=memory, response=json_selection_response)
+                        turn_action = json_selection_response
+                        turn_observation = None
 
                     if self.should_terminate(selection_response):
                         break
-
+            turn_feedback = feedback_builder.build_agent_feedback(task=task, action=turn_action, observation=turn_observation,
+                                                  resources=self.resources)
         final_response = json.loads(memory.get_memories()[-1]["content"])
         return final_response

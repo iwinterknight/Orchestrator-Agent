@@ -1,8 +1,7 @@
 import uuid
-from dataclasses import dataclass, asdict, field
-from typing import List, Optional, Dict, Any
+from dataclasses import dataclass, field
+from typing import Optional, Dict, Any
 
-from agent_builder.goal_builder import GoalItem
 from agent_builder.memory_builder import Memory
 from utils.llm_api import infer_llm_json
 from utils.prompt_store import PromptStore
@@ -36,7 +35,6 @@ def normalize_context(raw: Any) -> Dict[str, Any]:
     raise ValueError(f"Could not normalize turn context from LLM output: {raw!r}")
 
 
-
 class ContextBuilder:
     def __init__(self, prompt_store: Optional[PromptStore] = None):
         turn_context_id = uuid.uuid4()
@@ -60,7 +58,7 @@ class ContextBuilder:
         }
 
         agent_context_builder_prompt = self.prompt_store.get_prompt("agent_context_builder_instruction",
-                                                                     **prompt_values)
+                                                                    **prompt_values)
         res = infer_llm_json(agent_context_builder_prompt)
         parsed_turn_context = normalize_context(res)
 

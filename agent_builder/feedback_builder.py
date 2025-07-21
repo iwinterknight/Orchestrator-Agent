@@ -1,5 +1,5 @@
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Dict, Any, List
 
@@ -10,11 +10,11 @@ from utils.prompt_store import PromptStore
 
 
 class TaskStatus(Enum):
-    PENDING     = "pending"
+    PENDING = "pending"
     IN_PROGRESS = "in_progress"
     CLARIFICATION = "clarification"
-    COMPLETED   = "completed"
-    FAILED      = "failed"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 @dataclass
@@ -46,7 +46,7 @@ def normalize_agent_feedback(raw: Any) -> Dict[str, Any]:
     raise ValueError(f"Could not normalize turn context from LLM output: {raw!r}")
 
 
-class AgentFeedbackBuilder:
+class FeedbackBuilder:
     def __init__(self, prompt_store: Optional[PromptStore] = None):
         feedback_id = uuid.uuid4()
         self.agent_feedback = AgentFeedback(id=feedback_id)
@@ -81,7 +81,8 @@ class AgentFeedbackBuilder:
     def format_action(self, action: ResourceRegistry) -> List[Dict]:
         pass
 
-    def build_agent_feedback(self, task: str, action: ResourceRegistry = None, observation: Any = None, resources: ResourceRegistry = None) -> AgentFeedback:
+    def build_agent_feedback(self, task: str, action: ResourceRegistry = None, observation: Any = None,
+                             resources: ResourceRegistry = None) -> AgentFeedback:
         tools, agents = resources.get_tools(), resources.get_agents()
 
         prompt_values = {
@@ -93,14 +94,14 @@ class AgentFeedbackBuilder:
         }
 
         agent_feedback_builder_prompt = self.prompt_store.get_prompt("agent_feedback_builder_instruction",
-                                                                    **prompt_values)
+                                                                     **prompt_values)
         res = infer_llm_json(agent_feedback_builder_prompt)
         parsed_agent_feedback = normalize_agent_feedback(res)
 
         self.agent_feedback = AgentFeedback(
             id=self.agent_feedback.id,
             task=task,
-            status=parsed_agent_feedback.get("status" , TaskStatus.PENDING),
+            status=parsed_agent_feedback.get("status", TaskStatus.PENDING),
             reasoning=parsed_agent_feedback.get("reasoning", "")
         )
 

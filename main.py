@@ -10,7 +10,6 @@ from agent_builder.resource_registry import ExecutableResourceRegistry, Resource
 from agent_builder.agent import Agent, prompt_adaptor
 from agent_builder.agent_language_builder import AgentFunctionCallingActionLanguage
 from agent_builder.environment_builder import Environment
-from agent_builder.goal_builder import GoalFactory, GoalItem
 from agent_builder.memory_builder import Memory
 from utils.llm_api import infer_llm_generation
 
@@ -158,13 +157,6 @@ def main():
         """
         return f"{message}\nTerminating..."
 
-    news_events_goal_input = "Use the tools provided and respond to user queries."
-    # news_events_goals = [
-    #     GoalItem(priority=1,
-    #              name="News & Events",
-    #              description=news_events_goal_input)
-    # ]
-    news_events_goals = None
     news_events_persona = "I am a focused news analysis agent. I specialize in retrieving the most relevant news articles based on your query, summarizing key developments, and presenting structured, informative responses grounded in real information."
     news_events_description = "A domain-aware information retrieval agent that searches a news repository, filters articles based on query relevance, and returns both a synthesized response and the matched articles. Ideal for surfacing recent events, identifying trends, or providing evidence-backed insights."
     news_events_skills = [AgentSkill(
@@ -188,7 +180,6 @@ def main():
 
     news_events_agent = Agent(
         agent_card=news_events_card,
-        goals=news_events_goals,
         agent_language=AgentFunctionCallingActionLanguage(),
         resources=ExecutableResourceRegistry(tools_factory=news_events_tools_factory,
                                              tags=["data_retrieval", "news_and_events", "news_and_events_terminate"]),
@@ -199,13 +190,6 @@ def main():
     )
 
 
-    goal_input = "Use the tools provided and respond to user queries as a chatbot."
-    # goals = [
-    #     GoalItem(priority=1,
-    #              name="Chatbot",
-    #              description=goal_input)
-    # ]
-    goals = None
     chatbot_persona = "You are a thoughtful AI coordinator. You break down user goals, recall past context, and decide whether to act directly or delegate to a specialized agent — always choosing the most effective path forward to accomplish the task, using the goals as a rough guideline."
     chatbot_description = "A reasoning-based AI orchestrator that intelligently selects the right agent or action to complete complex tasks using goals, memory, and tools."
     chatbot_skills = [AgentSkill(
@@ -228,7 +212,6 @@ def main():
 
     chat_agent = Agent(
         agent_card=chatbot_card,
-        goals=None,
         agent_language=AgentFunctionCallingActionLanguage(),
         resources=ExecutableResourceRegistry(tools_factory=chatbot_tools_factory,
                                              agents=[news_events_agent.agent_context],

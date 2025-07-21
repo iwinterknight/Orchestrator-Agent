@@ -1,20 +1,21 @@
 import json
-from dataclasses import dataclass, field
+import uuid
+from dataclasses import dataclass, field, is_dataclass, asdict
 from typing import List, Dict, Any
 
 from agent_builder.agent_factory import AgentContext
 from agent_builder.context_builder import TurnContext
-from agent_builder.resource_registry import Tool, ToolContext
 from agent_builder.environment_builder import Environment
-from agent_builder.goal_builder import GoalItem
 from agent_builder.memory_builder import Memory
+from agent_builder.plan_builder import Plan
+from agent_builder.resource_registry import Tool, ToolContext
 from utils.prompt_store import PromptStore
 
 
 @dataclass
 class Prompt:
     task: str = ""
-    goals: List[Dict] = field(default_factory=list)
+    plan: Dict = field(default_factory=dict)
     memory: List[Dict] = field(default_factory=list)
     tools: List[Dict] = field(default_factory=list)
     agents: List[Dict] = field(default_factory=list)
@@ -28,7 +29,7 @@ class AgentLanguage:
 
     def construct_prompt(self,
                          task: str,
-                         goals: List[GoalItem],
+                         plan: Plan,
                          memory: Memory,
                          tools: List[Tool],
                          inject_prompt_instruction: str,
@@ -64,13 +65,21 @@ class AgentFunctionCallingActionLanguage(AgentLanguage):
 
         return mapped_items
 
-    def format_goals(self, goals: List[GoalItem]) -> List:
-        sep = "\n-------------------\n"
-        # goal_instructions = "\n\n".join([f"{goal.name}:{sep}{goal.description}{sep}" for goal in goals])
-        goal_instructions = "\n\n".join([f"{goal.short_term_goal}:{sep}{goal.long_term_goal}{sep}:{sep}{goal.status}{sep}::{sep}{goal.accomplished}{sep}" for goal in goals])
-        return [
-            {"role": "system", "content": goal_instructions}
-        ]
+    def format_plan(self, plan: Plan = None) -> Dict:
+        if plan:
+            if is_dataclass(plan):
+                data = asdict(plan)
+            elif hasattr(plan, "__dict__"):
+                data = plan.__dict__.copy()
+            else:
+                raise TypeError(f"Cannot convert object of type {type(plan)} to dict")
+
+            id_val = data.get("id")
+            if isinstance(id_val, uuid.UUID):
+                data["id"] = str(id_val)
+
+            return data
+        return {}
 
     def format_tools(self, tools: List[Tool], limit=1024) -> List[Dict]:
         tools = [
@@ -106,11 +115,9 @@ class AgentFunctionCallingActionLanguage(AgentLanguage):
         }
         return serialized_turn_context
 
-
-
     def construct_prompt(self,
                          task: str,
-                         goals: List[GoalItem],
+                         plan: Plan,
                          memory: Memory,
                          tools: List[Tool],
                          inject_prompt_instruction: str,
@@ -122,15 +129,14 @@ class AgentFunctionCallingActionLanguage(AgentLanguage):
 
         formatted_prompt = Prompt(
             task=task,
-            goals=self.format_goals(goals),
+            plan=self.format_plan(plan),
             memory=self.format_memory(memory),
-            tools=self.format_tools(tools),
+            tools=self.format_tools(tools) if tools else None,
             agents=self.format_agents(agents) if agents else None,
             turn_context=self.format_turn_context(turn_context) if turn_context else None
         )
 
         return formatted_prompt
-
 
     def adapt_prompt_after_parsing_error(self,
                                          prompt: Prompt,

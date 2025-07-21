@@ -4,18 +4,16 @@ from typing import List, Dict, Any
 
 from openai import OpenAI
 
-from utils.prompt_store import PromptStore
 from agent_builder.tools_factory import ToolsFactory
-
+from utils.prompt_store import PromptStore
 
 # os.environ["OPENAI_API_KEY"] = "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"
-os.environ["OPENAI_API_KEY"] = "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"
-
+os.environ[
+    "OPENAI_API_KEY"] = "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"
 
 client = OpenAI(
     api_key=os.environ.get("OPENAI_API_KEY")
 )
-
 
 prompt_store = PromptStore()
 
@@ -40,11 +38,11 @@ def to_openai_functions(tools_factory: ToolsFactory):
     openai_funcs = []
     for tool_name, meta in tools_factory.tools.items():
         # pick your JSON‐Schema: prefer input_schema if present
-        schema = meta.get("input_schema") or meta["parameters"]
+        schema = meta.input_schema or meta.parameters
 
         openai_funcs.append({
             "name": tool_name,
-            "description": meta["description"][:1024],
+            "description": meta.description[:1024],
             "parameters": schema,
         })
     return openai_funcs
@@ -81,9 +79,10 @@ def infer_llm_json(prompt: str,
                     "Error": {"message": f"LLM call failed: {e}"}
                 }
 
+
 def infer_llm_task_routing(
         task: str,
-        goals: List[Dict],
+        plan: Dict,
         memory: List[Dict],
         tools: List[Dict],
         agents: List[Dict] = None,
@@ -94,32 +93,28 @@ def infer_llm_task_routing(
 ):
     prompt_values = {
         "task": task,
-        "goals": goals,
+        "plan": plan,
         "memory": memory,
         "tools": tools,
         "agents": agents,
         "turn_context": turn_context
     }
     formatted_prompt = prompt_store.get_prompt("agent_routing_prompt", **prompt_values)
-    routing_response = infer_llm_json(prompt=formatted_prompt, model=model, temperature=0.0, max_tokens=max_tokens, num_retries=num_retries)
+    routing_response = infer_llm_json(prompt=formatted_prompt, model=model, temperature=0.0, max_tokens=max_tokens,
+                                      num_retries=num_retries)
     return routing_response
 
 
 def infer_llm_tool_selection(
-    task: str,
-    goals: List[Dict],
-    memory: List[Dict],
-    tools_factory: ToolsFactory,
-    turn_context: Dict[str, Any] = None,
-    model: str = "gpt-4o",
-    max_tokens: int = 8096,
-    num_retries: int = 3
+        task: str,
+        plan: Dict,
+        memory: List[Dict],
+        tools_factory: ToolsFactory,
+        turn_context: Dict[str, Any] = None,
+        model: str = "gpt-4o",
+        max_tokens: int = 8096,
+        num_retries: int = 3
 ) -> Dict[str, Any]:
-    """
-    Ask the LLM to pick exactly one function per turn, enforce clean arguments,
-    and unwrap any nested invocation that it might accidentally emit.
-    """
-    # 1) Build the enhanced instruction
     system_instruction = (
         f"Your task : {task}\n\n"
         "Remove any backticks or line breaks from the output. "
@@ -129,73 +124,65 @@ def infer_llm_tool_selection(
         "- Do NOT wrap any other keys (like “tool” or “args”) inside the arguments object.\n"
         "- Invoke exactly one function per response.\n"
         "- Do not invent new tools or agents.\n"
-        "- Given the memory and the responses from the function calls and agent invocations, you can reframe the task with additional information. If not, return the original `task` as the `reframed_task` value.\n"
-        "- Except for any termination tool, do not call a function or agent multiple times unless there is additional information available in the task being given to the function or agent.\n"
+        "- Given the memory and the responses from the tool calls, you can reframe the task with additional information. If not, return the original `task` as the `reframed_task` value.\n"
+        "- Except for any termination tool, do not call a function multiple times unless there is additional information available in the task being given to the function or agent.\n"
         "- Use Context as a guideline for which tool to execute and how."
     )
 
-    # 2) Annotated GOALS and MEMORY blocks
-    goal_block = {
+    plan_block = {
         "role": "system",
-        "content": "## GOALS ##\n" + json.dumps(goals, indent=2)
+        "content": "## PLAN ##\n" + json.dumps(plan, indent=2)
     }
     memory_block = {
         "role": "system",
         "content": "## MEMORY ##\n" + json.dumps(memory, indent=2)
     }
-
     context_block = {
         "role": "system",
         "content": "## CONTEXT ##\n" + json.dumps(turn_context, indent=2)
     }
-
-    # 3) Final message list
     messages: List[Dict[str, Any]] = [
         {"role": "system", "content": system_instruction},
-        goal_block,
+        plan_block,
         memory_block,
+        context_block
     ]
 
-    # 3) Prepare function specs
     functions = to_openai_functions(tools_factory)
 
     params = {
-        "model":         model,
-        "messages":      messages,
-        "functions":     functions,
+        "model": model,
+        "messages": messages,
+        "functions": functions,
         "function_call": "auto",
-        "max_tokens":    max_tokens,
-        "temperature":   0,
-        "top_p":         1.0,
-        "n":             1,
+        "max_tokens": max_tokens,
+        "temperature": 0,
+        "top_p": 1.0,
+        "n": 1,
         "frequency_penalty": 0,
-        "presence_penalty":  0,
+        "presence_penalty": 0,
     }
 
-    # 4) Retry loop
     for attempt in range(num_retries):
         try:
             resp = client.chat.completions.create(**params)
-            msg  = resp.choices[0].message
+            msg = resp.choices[0].message
 
-            # A) Preferred: official function_call channel
             if msg.function_call:
                 call = msg.function_call
                 tool = call.name
                 raw_args = json.loads(call.arguments or "{}")
 
-                # Unwrap nested invocation if needed
                 if (
-                    isinstance(raw_args, dict)
-                    and "tool" in raw_args
-                    and "args" in raw_args
-                    and raw_args["tool"] == tool
+                        isinstance(raw_args, dict)
+                        and "tool" in raw_args
+                        and "args" in raw_args
+                        and raw_args["tool"] == tool
                 ):
                     args = raw_args["args"]
                 else:
                     args = raw_args
 
-            # B) Fallback: parse raw JSON in content
             else:
                 content = (msg.content or "").strip()
                 try:
@@ -208,7 +195,6 @@ def infer_llm_tool_selection(
                         "args": {"message": f"error message : {e}\nmessage content : {content}"}
                     }
 
-            # 5) Strip any legacy prefix
             if isinstance(tool, str) and tool.startswith("functions."):
                 tool = tool.split(".", 1)[1]
 
