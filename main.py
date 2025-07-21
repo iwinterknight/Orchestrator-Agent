@@ -136,8 +136,8 @@ def main():
         Returns:
             Response as a string
         """
-        # url = f'http://192.168.1.49:8020/api/search_and_recommendation'
-        url = f'http://10.3.7.166:8020/api/search_and_recommendation'
+        url = f'http://192.168.49.1:8020/api/search_and_recommendation'
+        # url = f'http://10.3.7.166:8020/api/search_and_recommendation'
         # url = f'http://192.168.49.1:8020/api/search_and_recommendation'
 
         payload = {
@@ -159,11 +159,12 @@ def main():
         return f"{message}\nTerminating..."
 
     news_events_goal_input = "Use the tools provided and respond to user queries."
-    news_events_goals = [
-        GoalItem(priority=1,
-                 name="News & Events",
-                 description=news_events_goal_input)
-    ]
+    # news_events_goals = [
+    #     GoalItem(priority=1,
+    #              name="News & Events",
+    #              description=news_events_goal_input)
+    # ]
+    news_events_goals = None
     news_events_persona = "I am a focused news analysis agent. I specialize in retrieving the most relevant news articles based on your query, summarizing key developments, and presenting structured, informative responses grounded in real information."
     news_events_description = "A domain-aware information retrieval agent that searches a news repository, filters articles based on query relevance, and returns both a synthesized response and the matched articles. Ideal for surfacing recent events, identifying trends, or providing evidence-backed insights."
     news_events_skills = [AgentSkill(
@@ -192,19 +193,19 @@ def main():
         resources=ExecutableResourceRegistry(tools_factory=news_events_tools_factory,
                                              tags=["data_retrieval", "news_and_events", "news_and_events_terminate"]),
         generate_response_routing=news_events_router,
-        generate_response_action_selection=news_events_selector,
+        generate_response_tool_selection=news_events_selector,
         generate_response=infer_llm_generation,
         environment=Environment()
     )
 
 
     goal_input = "Use the tools provided and respond to user queries as a chatbot."
-    goals = [
-        GoalItem(priority=1,
-                 name="Chatbot",
-                 description=goal_input)
-    ]
-
+    # goals = [
+    #     GoalItem(priority=1,
+    #              name="Chatbot",
+    #              description=goal_input)
+    # ]
+    goals = None
     chatbot_persona = "You are a thoughtful AI coordinator. You break down user goals, recall past context, and decide whether to act directly or delegate to a specialized agent — always choosing the most effective path forward to accomplish the task, using the goals as a rough guideline."
     chatbot_description = "A reasoning-based AI orchestrator that intelligently selects the right agent or action to complete complex tasks using goals, memory, and tools."
     chatbot_skills = [AgentSkill(
@@ -219,7 +220,7 @@ def main():
             "User: What files are in the directory?\n→ Action: list_project_files",
             "User: Summarize key org changes.\n→ Action: people_org_response",
             "User: Create a paragraph about our mission.\n→ Action: generate_content",
-            "User: We're done here.\n→ Action: terminate"
+            "User: We're done here.\n→ Tool: terminate"
         ]
     )]
     chatbot_card = AgentCard(name="Chatbot", persona=chatbot_persona, description=chatbot_description,
@@ -227,13 +228,13 @@ def main():
 
     chat_agent = Agent(
         agent_card=chatbot_card,
-        goals=goals,
+        goals=None,
         agent_language=AgentFunctionCallingActionLanguage(),
         resources=ExecutableResourceRegistry(tools_factory=chatbot_tools_factory,
                                              agents=[news_events_agent.agent_context],
                                              tags=["file_operations", "generate", "chatbot_terminate", "data_retrieval"]),
         generate_response_routing=chatbot_router,
-        generate_response_action_selection=chatbot_selector,
+        generate_response_tool_selection=chatbot_selector,
         generate_response=infer_llm_generation,
         environment=Environment()
     )

@@ -5,7 +5,7 @@ from agent_builder.agent_factory import AgentCard, AgentContext
 from typing import List, Callable, Dict, Any, Optional
 
 
-class Action:
+class Tool:
     def __init__(self, name: str, function: Callable, description: str, parameters: Dict, input_schema: Dict = None, output_schema: Dict = None, terminal: bool = False):
         self.name = name
         self.function = function
@@ -19,7 +19,7 @@ class Action:
         return self.function(**args)
 
 
-class ActionContext:
+class ToolContext:
     def __init__(self, properties: Dict=None):
         self.context_id = str(uuid.uuid4())
         self.properties = properties or {}
@@ -33,17 +33,17 @@ class ActionContext:
 
 class ResourceRegistry:
     def __init__(self):
-        self.actions = {}
+        self.tools = {}
         self.agents = {}
 
-    def register_action(self, action: Action):
-        self.actions[action.name] = action
+    def register_tool(self, tool: Tool):
+        self.tools[tool.name] = tool
 
-    def get_action(self, name: str) -> Optional[Action]:
-        return self.actions.get(name, None)
+    def get_tool(self, name: str) -> Optional[Tool]:
+        return self.tools.get(name, None)
 
-    def get_actions(self) -> List[Action]:
-        return list(self.actions.values())
+    def get_tools(self) -> List[Tool]:
+        return list(self.tools.values())
 
     def register_agent(self, agent_name: str, agent_context: AgentContext):
         self.agents[agent_name] = agent_context
@@ -72,7 +72,7 @@ class ExecutableResourceRegistry(ResourceRegistry):
             if tags and not any(tag in tool_tags for tag in tags):
                 continue
 
-            self.register_action(Action(
+            self.register_tool(Tool(
                 name=tool_name,
                 function=tool_desc["function"],
                 description=tool_desc["description"],
@@ -89,7 +89,7 @@ class ExecutableResourceRegistry(ResourceRegistry):
 
     def register_terminate_tool(self):
         if self.terminate_tool:
-            self.register_action(Action(
+            self.register_tool(Tool(
                 name="terminate",
                 function=self.terminate_tool["function"],
                 description=self.terminate_tool["description"],

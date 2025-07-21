@@ -3,7 +3,7 @@ import inspect
 import traceback
 from typing import Any
 
-from agent_builder.resource_registry import Action, ActionContext
+from agent_builder.resource_registry import Tool, ToolContext
 
 
 class Environment:
@@ -25,22 +25,22 @@ class Environment:
             # If func is not callable or signature cannot be determined
             return False
 
-    def execute_action(self, action: Action, args: dict, action_context: ActionContext=None) -> dict:
+    def execute_tool(self, tool: Tool, args: dict, tool_context: ToolContext=None) -> dict:
         try:
             args_copy = args.copy()
 
-            if action_context:
-                # If the function wants action_context, provide it
-                if self.__has_named_parameter(action.function, "action_context"):
-                    args_copy["action_context"] = action_context
+            if tool_context:
+                # If the function wants tool_context, provide it
+                if self.__has_named_parameter(tool.function, "tool_context"):
+                    args_copy["tool_context"] = tool_context
 
-                # Inject properties from action_context that match _prefixed parameters
-                for key, value in action_context.properties.items():
+                # Inject properties from tool_context that match _prefixed parameters
+                for key, value in tool_context.properties.items():
                     param_name = "_" + key
-                    if self.__has_named_parameter(action.function, param_name):
+                    if self.__has_named_parameter(tool.function, param_name):
                         args_copy[param_name] = value
 
-            result = action.execute(**args)
+            result = tool.execute(**args)
             return self.format_result(result)
         except Exception as e:
             return {

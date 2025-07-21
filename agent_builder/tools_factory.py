@@ -39,7 +39,7 @@ class ToolsFactory:
             }
             for param_name, param in signature.parameters.items():
 
-                if param_name in ["action_context", "action_agent"] or param_name.startswith("_"):
+                if param_name in ["tool_context", "agent_context"] or param_name.startswith("_"):
                     continue  # Skip these parameters
 
                 def get_json_type(param_type):

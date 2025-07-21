@@ -5,6 +5,7 @@ from typing import List, Any, Dict, Optional
 
 from agent_builder.agent_factory import AgentContext
 from agent_builder.memory_builder import Memory
+from agent_builder.resource_registry import ResourceRegistry
 from agent_builder.tools_factory import ToolsFactory
 from utils.llm_api import infer_llm_json
 from utils.prompt_store import PromptStore
@@ -24,7 +25,6 @@ class GoalItem:
     description: str
     short_term_goal: str
     long_term_goal: str
-    priority: int
     status: GoalStatus = GoalStatus.PENDING
     accomplished: bool = False
 
@@ -49,41 +49,43 @@ def normalize_goal_list(raw: Any) -> List[Dict]:
 
 class GoalFactory:
     def __init__(self, prompt_store: Optional[PromptStore] = None):
-        self.goals = []
+        self.goal_items = []
         self.prompt_store = prompt_store or PromptStore()
 
     def add_goal(self, goal: GoalItem):
-        self.goals.append(goal)
+        self.goal_items.append(goal)
 
     def get_goals(self, limit: int = None) -> List[GoalItem]:
-        return self.goals[:limit]
+        return self.goal_items[:limit]
 
     def infer_goals(self,
                     task: str,
                     goals: List[GoalItem],
                     progress_report: Dict[str, Any],
-                    tools_factory: ToolsFactory,
+                    resources: ResourceRegistry = None,
                     memory: Memory = None,
-                    agents: AgentContext = None
                     ) -> List[GoalItem]:
-        tools_list = [
-            {"name": name, "description": meta["description"]}
-            for name, meta in tools_factory.tools.items()
-        ]
+
+        tools_list = resources.get_tools()
+        agents = resources.get_agents()
 
         mem_items = [
             {"type": m["type"], "content": m["content"]}
             for m in memory.get_memories()
             if (
                     m.get("type") == "user"
-                    or (m.get("type") == "assistant" and "tool" in m.get("content", ""))
+                    or (m.get("type") == "agent" and "tool" in m.get("content", ""))
                     or (m.get("type") == "environment" and "tool_executed" in m.get("content", ""))
             )
         ]
 
+        if goals:
+            serialized_goals = [asdict(item) for item in goals]
+        else:
+            serialized_goals = []
         prompt_values = {
             "task": task,
-            "goals": [asdict(goal) for goal in goals],
+            "goals": serialized_goals,
             "progress_report": progress_report,
             "tools": tools_list,
             "agents": agents,
@@ -100,7 +102,6 @@ class GoalFactory:
             try:
                 name = str(g["name"])
                 description = str(g["description"])
-                priority = int(g["priority"])
                 short_term_goal = str(g["short_term_goal"])
                 long_term_goal = str(g["long_term_goal"])
                 status = GoalStatus(g["status"])
@@ -108,7 +109,7 @@ class GoalFactory:
             except KeyError as ke:
                 raise KeyError(f"Missing field {ke} in goal: {g!r}")
             goal_id = uuid.uuid4()
-            goals.append(GoalItem(id=goal_id, name=name, description=description, priority=priority, short_term_goal=short_term_goal,
+            goals.append(GoalItem(id=goal_id, name=name, description=description, short_term_goal=short_term_goal,
                                   long_term_goal=long_term_goal, status=status, accomplished=accomplished))
 
         return goals
