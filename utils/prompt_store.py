@@ -140,12 +140,6 @@ class PromptStore:
                 •  **Observation** (any or null):  
                    What the environment returned after the last action (e.g., success message, error details, data payload).
                 
-                •  **Tools** (array of objects):  
-                   Each with `"name"`, `"description"`, and `"parameters"`. These are atomic functions the agent can call.
-                
-                •  **Agents** (array of objects):  
-                   Each with `"name"`, `"persona"`, `"description"`, and `"skills"`. These are sub‑agents available for complex tasks.
-                
                 ---
                 
                 ### Instructions
@@ -177,10 +171,6 @@ class PromptStore:
                 Action: {action}
                 
                 Observation: {observation}
-                
-                Tools: {tools}
-                
-                Agents: {agents}
             """,
 
             "agent_routing_prompt": """

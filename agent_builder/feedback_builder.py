@@ -25,25 +25,32 @@ class AgentFeedback:
     reasoning: str = ""
 
 
-def normalize_agent_feedback(raw: Any) -> Dict[str, Any]:
+def normalize_feedback(raw: Any) -> Dict[str, Any]:
     if not isinstance(raw, dict):
-        raise ValueError(f"Expected dict from LLM for turn context, got: {type(raw)} - {raw!r}")
+        raise ValueError(f"Expected dict from LLM for feedback, got: {type(raw)} - {raw!r}")
 
     def extract_fields(d: Dict[str, Any]) -> Dict[str, Any]:
+        status_val = d.get("status")
+        reasoning_val = d.get("reasoning", "")
+        if not isinstance(status_val, str):
+            raise TypeError(f"'status' field must be a string, got {type(status_val)}: {status_val!r}")
+        try:
+            status_enum = TaskStatus(status_val)
+        except ValueError:
+            raise ValueError(f"Invalid status value: {status_val!r}")
         return {
-            "execution_choices": d.get("execution_choices", {}),
-            "reasoning": d.get("reasoning", ""),
-            "name": d.get("name", "")
+            "status": status_enum,
+            "reasoning": reasoning_val
         }
 
-    if any(k in raw for k in ("execution_choices", "reasoning", "name")):
+    if "status" in raw and "reasoning" in raw:
         return extract_fields(raw)
 
-    for _, v in raw.items():
-        if isinstance(v, dict) and any(k in v for k in ("execution_choices", "reasoning", "name")):
+    for v in raw.values():
+        if isinstance(v, dict) and "status" in v and "reasoning" in v:
             return extract_fields(v)
 
-    raise ValueError(f"Could not normalize turn context from LLM output: {raw!r}")
+    raise ValueError(f"Could not normalize agent feedback from LLM output: {raw!r}")
 
 
 class FeedbackBuilder:
@@ -89,14 +96,12 @@ class FeedbackBuilder:
             "task": task,
             "action": action,
             "observation": observation,
-            "tools": self.format_tools(tools) if tools else None,
-            "agents": self.format_agents(agents) if agents else None,
         }
 
         agent_feedback_builder_prompt = self.prompt_store.get_prompt("agent_feedback_builder_instruction",
                                                                      **prompt_values)
         res = infer_llm_json(agent_feedback_builder_prompt)
-        parsed_agent_feedback = normalize_agent_feedback(res)
+        parsed_agent_feedback = normalize_feedback(res)
 
         self.agent_feedback = AgentFeedback(
             id=self.agent_feedback.id,
