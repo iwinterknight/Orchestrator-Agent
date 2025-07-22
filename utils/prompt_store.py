@@ -36,8 +36,9 @@ class PromptStore:
                 3. **For each step**, include:
                    - A brief `"action"` (tool or agent invocation, with any key parameters),  
                    - A one‑sentence `"description"` explaining why or how.  
-                4. **Be concise**—no more than 5–7 steps unless absolutely necessary. Unless asked for detail/report etc., keep the plan limited to 1-2 steps.
-                5. Return **exactly** one JSON object with two top‑level fields:
+                4. **Be concise**—no more than 5–7 steps unless absolutely necessary. Unless asked for detail/report etc., keep the plan limited to 2-3 steps.
+                5. In general, focus on the latest memory items.
+                6. Return **exactly** one JSON object with two top‑level fields:
                 
                 ```json
                 {{
@@ -274,7 +275,8 @@ class PromptStore:
                 6. **Given the `Turn Context`, use the `data`(if present) to generate a response. Especially if the feedback refers to using the payload(The `data` items present in `Turn Context` constitute the payload). This might contain important information needed to generate response.**
                 7. Only return fields explicitly described in the format below.
                 8. Unless asked for detail/report etc., keep your responses concise.
-                9. Provide the following as a json output:
+                9. In general, focus on the latest memory items. In case the Last Step Feedback is absent, rely on the Plan to find relevant items from the Turn Context.
+                10. Provide the following as a json output:
                    - The type: `"agent"`, `"tool"`, `"generate_response_and_terminate"` 
                    - The name of the selected agent or tool, if any. In case of `"generate_response_and_terminate"`, leave this blank.
                    - When calling a tool, you DO NOT need to provide arguments required to invoke it, only the name of the tool and `reframed_task` along with it.

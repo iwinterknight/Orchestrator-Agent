@@ -128,6 +128,23 @@ class Agent:
 
         return tool, normalized_invocation
 
+    def generate_response_from_payload(self, task: str, response: str, content: str = ""):
+        data = []
+        if "response" in response:
+            payload_ids = response["response"]["payload_ids"]
+        else:
+            payload_ids = response["payload_ids"]
+        for payload_id in payload_ids:
+            data.append({
+                "payload_id": payload_id,
+                "payload": self.payload_memory.retrieve_payload(payload_id)
+            })
+        prompt = (
+            f"Directions: {task}\nContent: {content}\nContext: {data}\n"
+        )
+        agent_response = infer_llm_generation(prompt)
+        return agent_response
+
     def should_terminate(self, invocation: Dict) -> bool:
         try:
             tool_def, _ = self.get_tool(invocation)
@@ -193,9 +210,9 @@ class Agent:
 
         print(f"Plan: {plan.plan}")
 
-        for _ in range(max_iterations):
+        for iteration in range(max_iterations):
             if turn_feedback:
-                print(f"Observation: {turn_observation}")
+                print(f"Observation: {turn_feedback.reasoning}")
 
             turn_context = context_builder.build_turn_context(task=task, memory=memory, feedback=turn_feedback)
 
@@ -210,17 +227,7 @@ class Agent:
                         invocation = "generate_response_and_terminate"
                         content = routing_response["response"]
                         if "payload_ids" in routing_response["response"] and routing_response["response"]["payload_ids"]:
-                            data = []
-                            payload_ids = routing_response["response"]["payload_ids"]
-                            for payload_id in payload_ids:
-                                data.append({
-                                    "payload_id": payload_id,
-                                    "payload": self.payload_memory.retrieve_payload(payload_id)
-                                    })
-                            prompt = (
-                                f"Directions: {task}\nContent: {content}\nContext: {data}\n"
-                            )
-                            agent_response = infer_llm_generation(prompt)
+                            agent_response = self.generate_response_from_payload(task=task, response=routing_response["response"])
                         else:
                             agent_response = routing_response.get("response")
                         # res_len = len(json.dumps(agent_response).split())
@@ -247,8 +254,11 @@ class Agent:
                 invoked_item = routing_response["name"]
                 invocations_counter[invoked_item] += 1
 
-                # if invocations_counter[invoked_item] > 2:
-                #     break
+                if invocations_counter[invoked_item] > 2:
+                    agent_response = self.generate_response_from_payload(task=reframed_task,
+                                                                         response=json.loads(
+                                                                             memory.get_memories()[-1]["content"]))
+                    return agent_response
 
                 if "type" in routing_response and routing_response["type"] == "agent":
                     scheduled_agent_name = routing_response["name"]
@@ -311,8 +321,10 @@ class Agent:
                         turn_action = json_selection_response
                         turn_observation = None
 
-                    # if self.should_terminate(selection_response):
-                    #     break
+                    if self.should_terminate(selection_response):
+                        agent_response = self.generate_response_from_payload(task=task,
+                                                                             response=json.loads(memory.get_memories()[-1]["content"]), content=selection_response)
+                        return agent_response
             turn_feedback = feedback_builder.build_agent_feedback(task=task, action=turn_action, observation=turn_observation,
                                                   resources=self.resources)
         final_response = json.loads(memory.get_memories()[-1]["content"])
