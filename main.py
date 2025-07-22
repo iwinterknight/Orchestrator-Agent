@@ -312,7 +312,7 @@ def main():
             break
         final_response = chat_agent.run(query, memory=memory)
         # final_response = json.loads(final_memory.get_memories()[-1]["content"])["result"]
-        print(f"{GREEN}=== RESPONSE ===:{RESET}", f"{GREEN}final_response{RESET}")
+        print(f"{GREEN}=== RESPONSE ===:{RESET}", f"{GREEN}{final_response}{RESET}")
 
 
 if __name__ == "__main__":
