@@ -83,21 +83,22 @@ def infer_llm_json(prompt: str,
 def infer_llm_task_routing(
         task: str,
         plan: Dict,
-        memory: List[Dict],
         tools: List[Dict],
         agents: List[Dict] = None,
+        memory: List[Dict] = None,
         turn_context: Dict[str, Any] = None,
+        feedback: Dict[str, Any] = None,
         model: str = "gpt-4.1",
-        max_tokens: int = 1024,
+        max_tokens: int = None,
         num_retries: int = 3
 ):
     prompt_values = {
         "task": task,
         "plan": plan,
-        "memory": memory,
+        "feedback": feedback,
         "tools": tools,
         "agents": agents,
-        "turn_context": turn_context
+        "turn_context": turn_context if turn_context else None
     }
     formatted_prompt = prompt_store.get_prompt("agent_routing_prompt", **prompt_values)
     routing_response = infer_llm_json(prompt=formatted_prompt, model=model, temperature=0.0, max_tokens=max_tokens,
@@ -108,7 +109,6 @@ def infer_llm_task_routing(
 def infer_llm_tool_selection(
         task: str,
         plan: Dict,
-        memory: List[Dict],
         tools_factory: ToolsFactory,
         turn_context: Dict[str, Any] = None,
         model: str = "gpt-4o",
@@ -118,14 +118,14 @@ def infer_llm_tool_selection(
     system_instruction = (
         f"Your task : {task}\n\n"
         "Remove any backticks or line breaks from the output. "
-        "When you act, pick one of the available functions and return it via function_call.\n\n"
+        "When you act, pick one of the available tools(or `functions`) and return it as a function_call.\n\n"
         "RULES:\n"
         "- Your function_call arguments must be a JSON object containing *only* that function’s parameters.\n"
         "- Do NOT wrap any other keys (like “tool” or “args”) inside the arguments object.\n"
-        "- Invoke exactly one function per response.\n"
-        "- Do not invent new tools or agents.\n"
-        "- Given the memory and the responses from the tool calls, you can reframe the task with additional information. If not, return the original `task` as the `reframed_task` value.\n"
-        "- Except for any termination tool, do not call a function multiple times unless there is additional information available in the task being given to the function or agent.\n"
+        "- Invoke exactly one tool per response.\n"
+        "- Do not invent new tools.\n"
+        "- Given the memory and the previous responses from the tool calls, you can reframe the task with additional information. If not, return the original `task` as the `reframed_task` value.\n"
+        "- Except for any termination tool, do not call a tool multiple times."
         "- Use Context as a guideline for which tool to execute and how."
     )
 
@@ -135,17 +135,12 @@ def infer_llm_tool_selection(
     }
     memory_block = {
         "role": "system",
-        "content": "## MEMORY ##\n" + json.dumps(memory, indent=2)
-    }
-    context_block = {
-        "role": "system",
-        "content": "## CONTEXT ##\n" + json.dumps(turn_context, indent=2)
+        "content": "## MEMORY ##\n" + json.dumps(turn_context, indent=2)
     }
     messages: List[Dict[str, Any]] = [
         {"role": "system", "content": system_instruction},
         plan_block,
-        memory_block,
-        context_block
+        memory_block
     ]
 
     functions = to_openai_functions(tools_factory)

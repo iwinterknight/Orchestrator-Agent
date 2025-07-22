@@ -11,7 +11,6 @@ from utils.prompt_store import PromptStore
 
 class TaskStatus(Enum):
     PENDING = "pending"
-    IN_PROGRESS = "in_progress"
     CLARIFICATION = "clarification"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -90,8 +89,6 @@ class FeedbackBuilder:
 
     def build_agent_feedback(self, task: str, action: ResourceRegistry = None, observation: Any = None,
                              resources: ResourceRegistry = None) -> AgentFeedback:
-        tools, agents = resources.get_tools(), resources.get_agents()
-
         prompt_values = {
             "task": task,
             "action": action,

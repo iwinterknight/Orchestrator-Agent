@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, Dict, List
 
 from agent_builder.agent_factory import AgentContext
-from agent_builder.feedback_builder import AgentFeedback
 from agent_builder.memory_builder import Memory
 from agent_builder.resource_registry import ResourceRegistry, Tool
 from utils.llm_api import infer_llm_json
@@ -77,17 +76,8 @@ class PlanBuilder:
             formatted_agents.append(context_item)
         return formatted_agents
 
-    def format_agent_feedback(self, agent_feedback: AgentFeedback) -> Dict[str, Any]:
-        return {
-            "id": str(agent_feedback.id),
-            "task": agent_feedback.task,
-            "status": agent_feedback.status.value,
-            "reasoning": agent_feedback.reasoning,
-        }
-
     def build_plan(self,
                    task: str,
-                   feedback: AgentFeedback = None,
                    resources: ResourceRegistry = None,
                    memory: Memory = None,
                    ) -> Plan:
@@ -106,7 +96,6 @@ class PlanBuilder:
 
         prompt_values = {
             "task": task,
-            "feedback": self.format_agent_feedback(feedback) if feedback else None,
             "tools": self.format_tools(tools) if tools else None,
             "agents": self.format_agents(agents) if agents else None,
             "memory": mem_items

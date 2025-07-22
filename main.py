@@ -10,7 +10,7 @@ from agent_builder.resource_registry import ExecutableResourceRegistry, Resource
 from agent_builder.agent import Agent, prompt_adaptor
 from agent_builder.agent_language_builder import AgentFunctionCallingActionLanguage
 from agent_builder.environment_builder import Environment
-from agent_builder.memory_builder import Memory
+from agent_builder.memory_builder import Memory, PayloadMemory
 from utils.llm_api import infer_llm_generation
 
 from agent_builder.agent import Agent
@@ -25,7 +25,8 @@ from utils.util import make_fastapi_request, initialize_logging
 logger = logging.getLogger('agent_log')
 initialize_logging(logger)
 
-# _redis = redis.Redis(host='localhost', port=6379, db=0)
+
+PAYLOAD_MEMORY = PayloadMemory()
 
 
 GENERATE_SCHEMA = {
@@ -94,17 +95,20 @@ def main():
 
     @chatbot_register_tool(
         tags=["generate", "additional information"],
-        # input_schema=GENERATE_SCHEMA,
-        # terminal=False  # don’t stop the loop yet
     )
-    def generate_content(content: str, directions: str) -> str:
+    def generate_content(content: str, directions: str, payload_id: str) -> str:
         """
-        Given 'instruction' and 'content' return the generated text.
-        'instruction' and 'content' are both strings.
+        Given 'directions', 'content' and 'payload_id'(all string types) return the generated text.
+        'payload_id' contains string type id that reference information in a memory store, to be used as context while generating content.
         """
+        data = []
+        if payload_id:
+            data.append({
+                "payload": PAYLOAD_MEMORY.retrieve_payload(payload_id)
+            })
         from utils.llm_api import infer_llm_generation
         prompt = (
-            f"Directions: {directions}\nContent: {content}\n"
+            f"Directions: {directions}\nContent: {content}\nContext: {data}\n"
         )
         return infer_llm_generation(prompt)
 
@@ -137,13 +141,31 @@ def main():
         """
         url = f'http://192.168.49.1:8020/api/search_and_recommendation'
         # url = f'http://10.3.7.166:8020/api/search_and_recommendation'
-        # url = f'http://192.168.49.1:8020/api/search_and_recommendation'
 
         payload = {
             "query": query
         }
         result = make_fastapi_request(url, logger, method="POST", params=payload)
         return result
+
+    @news_events_register_tool(
+        tags=["generate", "additional information"],
+    )
+    def generate_content(content: str, directions: str, payload_id: str) -> str:
+        """
+        Given 'directions', 'content' and 'payload_id'(all string types) return the generated text.
+        'payload_id' contains string type id that reference information in a memory store, to be used as context while generating content.
+        """
+        data = []
+        if payload_id:
+            data.append({
+                "payload": PAYLOAD_MEMORY.retrieve_payload(payload_id)
+            })
+        from utils.llm_api import infer_llm_generation
+        prompt = (
+            f"Directions: {directions}\nContent: {content}\nContext: {data}\n"
+        )
+        return infer_llm_generation(prompt)
 
     @news_events_register_tool(tags=["news_and_events_terminate"], terminal=True)
     def news_and_events_terminate(message: str) -> str:
@@ -182,11 +204,12 @@ def main():
         agent_card=news_events_card,
         agent_language=AgentFunctionCallingActionLanguage(),
         resources=ExecutableResourceRegistry(tools_factory=news_events_tools_factory,
-                                             tags=["data_retrieval", "news_and_events", "news_and_events_terminate"]),
+                                             tags=["data_retrieval", "news_and_events", "generate", "additional information", "news_and_events_terminate"]),
         generate_response_routing=news_events_router,
         generate_response_tool_selection=news_events_selector,
         generate_response=infer_llm_generation,
-        environment=Environment()
+        environment=Environment(),
+        payload_memory=PAYLOAD_MEMORY
     )
 
 
@@ -219,7 +242,8 @@ def main():
         generate_response_routing=chatbot_router,
         generate_response_tool_selection=chatbot_selector,
         generate_response=infer_llm_generation,
-        environment=Environment()
+        environment=Environment(),
+        payload_memory=PAYLOAD_MEMORY
     )
 
     # for i in range(100):

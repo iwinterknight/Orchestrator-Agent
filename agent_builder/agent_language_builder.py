@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 from agent_builder.agent_factory import AgentContext
 from agent_builder.context_builder import TurnContext
 from agent_builder.environment_builder import Environment
+from agent_builder.feedback_builder import AgentFeedback
 from agent_builder.memory_builder import Memory
 from agent_builder.plan_builder import Plan
 from agent_builder.resource_registry import Tool, ToolContext
@@ -16,11 +17,11 @@ from utils.prompt_store import PromptStore
 class Prompt:
     task: str = ""
     plan: Dict = field(default_factory=dict)
-    memory: List[Dict] = field(default_factory=list)
+    memory: Any = None
     tools: List[Dict] = field(default_factory=list)
     agents: List[Dict] = field(default_factory=list)
     turn_context: Dict = field(default_factory=dict)
-    metadata: Dict = field(default_factory=dict)
+    feedback: Dict[str, Any] = field(default_factory=dict)
 
 
 class AgentLanguage:
@@ -30,12 +31,13 @@ class AgentLanguage:
     def construct_prompt(self,
                          task: str,
                          plan: Plan,
-                         memory: Memory,
                          tools: List[Tool],
                          inject_prompt_instruction: str,
                          environment: Environment,
+                         memory: Memory = None,
                          agents: List[AgentContext] = None,
                          turn_context: TurnContext = None,
+                         feedback: AgentFeedback = None,
                          tool_context: ToolContext = None,
                          schema: Dict = None) -> Prompt:
         raise NotImplementedError("Subclasses must implement this method")
@@ -111,28 +113,39 @@ class AgentFunctionCallingActionLanguage(AgentLanguage):
         serialized_turn_context = {
             "id": str(turn_context.id),
             "task": turn_context.task,
-            "context": turn_context.context  # assuming it's already a JSON-serializable array
+            "context": turn_context.context,  # assuming it's already a JSON-serializable array
+            "data": turn_context.data
         }
         return serialized_turn_context
+
+    def format_agent_feedback(self, agent_feedback: AgentFeedback) -> Dict[str, Any]:
+        return {
+            "id": str(agent_feedback.id),
+            "task": agent_feedback.task,
+            "status": agent_feedback.status.value,
+            "reasoning": agent_feedback.reasoning,
+        }
 
     def construct_prompt(self,
                          task: str,
                          plan: Plan,
-                         memory: Memory,
                          tools: List[Tool],
                          inject_prompt_instruction: str,
                          environment: Environment,
+                         memory: Memory = None,
                          agents: List[AgentContext] = None,
                          turn_context: TurnContext = None,
+                         feedback: AgentFeedback = None,
                          tool_context: ToolContext = None,
                          schema: Dict = None) -> Prompt:
 
         formatted_prompt = Prompt(
             task=task,
             plan=self.format_plan(plan),
-            memory=self.format_memory(memory),
             tools=self.format_tools(tools) if tools else None,
             agents=self.format_agents(agents) if agents else None,
+            memory=memory if memory else None,
+            feedback=self.format_agent_feedback(feedback) if feedback else None,
             turn_context=self.format_turn_context(turn_context) if turn_context else None
         )
 

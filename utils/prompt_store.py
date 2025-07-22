@@ -7,13 +7,6 @@ class PromptStore:
                 
                 •  **Task** (string):  
                    The user’s request—an overarching goal for the agent to achieve.  
-                
-                •  **Last Step Feedback** (object or null):  
-                   An AgentFeedback dict with:
-                   - **id**: the UUID of the last step  
-                   - **task**: the last sub‑task description  
-                   - **status**: one of "pending", "in_progress", "clarification", "completed", "failed"  
-                   - **reasoning**: why it succeeded/failed or what needs clarifying
    
                 •  **Tools** (array of objects):  
                    Each tool has a `"name"` and `"description"`. These are the atomic actions your agent can invoke.  
@@ -55,9 +48,7 @@ class PromptStore:
                 ---
                 
                 Task : {task}
-                
-                Last Step Feedback: {feedback}
-                
+                                
                 Tools: {tools}
                 
                 Agents: {agents}
@@ -84,23 +75,36 @@ class PromptStore:
                               {{ "type": "environment", "content": "StockPriceTool returned $175.20" }},
                                 ...
                             ]
-                
+                                
+                3. Last Step Feedback (object or null):  
+                   A dict with:
+                   - **id**: the UUID of the last step's feedback  
+                   - **task**: the last sub‑task description  
+                   - **status**: one of "pending", "in_progress", "clarification", "completed", "failed"  
+                   - **reasoning**: why it succeeded/failed or what needs clarifying
+                               
                 # ========== INSTRUCTIONS ==========
                 **1. Digest the context**
                 
                 * Examine MEMORY. MEMORY contains the tasks/queries/requests from the `user`, the `agent` taken by the agent to execute/respond to the user task(Thought) and `environment` which contains the result of taking the action(Observation).
+                  * Some memory items might contain `payload` information. Essentially these are large volumes of data that are referenced by the memory via `payload_id`(s).
+                * Use the `Last Step Feedback` and `MEMORY` to identify if this step might need some payload data.
+                  * If this step requires the payload data you must provide a list of `payload_ids` for the respective memory item, in your response. Use the `payload_description` to understand the usefulness of the payload.
+                  * If you want to include the `payload_id`(s), **make sure the payload_id(s) you include are picked from the payload_id(s) that appear in the memory item**.
+                  * **Do not invent a `payload_id`**.
                 * Identify information that is:
-                  * Immediately relevant memory items that are going to be helpful to the agent in choosing the next action. For this you need to extract the individual memory items from the list of memory items.  
+                  * Relevant memory items that are going to be helpful to the agent in choosing the next action.  
                 * Form a `context` that contains the relevant memory items and explicitly include any contextual information from the previous memory items that may help the agent in the next step.
                 * You are free to form the `context` object so long as it is a valid json. Give field names and field descriptions so that the agent can understand the context information clearly.
-                * When in doubt, include information in the context instead of leaving it out. The main objective here is to only expose the agent to relevant information from the previous steps (user, agent or environment) for the next step. 
+                * Include the relevant memory items in context. When in doubt include the memory item in context. The main objective here is to only expose the agent to relevant information from the previous steps (user, agent or environment) for the next step.
+                * Include the `payload_id`(s) from the memory items which you deem necessary for the next step.
                 
                 **2. Output rules**
                 
                 1. Return **pure JSON** — *no* markdown, comments, or code‑fences.  
                 2. Include **exactly** these top‑level keys:  
-                   `task`, `context`.
-                3. The context can have subfields that contain information from the previous steps. Give clear intuitive field names and field descriptions. 
+                   `task`, `context`, `payload_ids`.
+                3. The context can have a subfield that describes the highlight of the task execution so far. This should be concise. 
                 4. The context field could have some items that are exactly present in the previous memory items or it could even be an overarching summary of the information from the previous turns or both.
                 5. The JSON must be valid and parsable.
                 
@@ -124,7 +128,10 @@ class PromptStore:
                 {task}
                 
                 MEMORY:  
-                {memory}
+                {memory}                
+                
+                Last Step Feedback:
+                {feedback}
             """,
 
             "agent_feedback_builder_instruction": """
@@ -148,7 +155,9 @@ class PromptStore:
                 1. **task**:  
                    A self‑contained summary of the overall goal (string).  
                 2. **status**:  
-                   One of `"pending"`, `"in_progress"`, `"clarification"`, `"completed"`, `"failed"`.  
+                   One of `"pending"`, `"clarification"`, `"completed"`, `"failed"`.  
+                   If you get a response for the task, avoid repetitive tool use by marking the task as `completed`, `failed` or `clarification`.
+                   Only mark task as `pending` when you have sufficient evidence of significant progress that can be made by reusing the agent or tool. 
                 3. **reasoning**:  
                    A brief explanation (1–2 sentences) of why you chose this status given the observation.
                 Return **only** a JSON object with these three fields.
@@ -176,11 +185,12 @@ class PromptStore:
             "agent_routing_prompt": """
                 You are an orchestration controller responsible for delegating tasks in a multi-agent AI system.
 
-                Your job is to analyze the user's goal and system context, and decide whether to:
-                - Use a **tool** that performs a specific atomic function
-                - Or delegate the task to an **agent** that handles complex, multi-step reasoning
+                Your job is to analyze the task and context, and decide whether to:
+                - Use a **tool** that performs a specific atomic function.
+                - Or delegate the task to an **agent** that handles complex, multi-step reasoning.
+                - Terminate the agent and revert to the user with a response. (`generate_response_and_terminate`)
                 
-                There is no preference. **Evaluate both options equally and deterministically**. Your goal is to make the best match based on function, examples, and arguments.
+                **Evaluate options equally and deterministically**. Your goal is to make the best match based on the provided `CONTEXT`.
                 Below is the description of the resources available to you and the information needed to route to the next tool or agent. The `CONTEXT` provides the resources and information.
                 ---
                 
@@ -188,15 +198,14 @@ class PromptStore:
                 
                 1. Task : This contains the high level task that needs to be performed. 
                 2. Plan : This contains an estimate of the activities needed to accomplish the task. You only need this as an approximate of the type of steps you might need to accomplish the task. If absent, ignore it.
-                3. Memory : This contains a history of the task/query/previous-step-response given by the user, the actions (tool use, agent invocation, response generation) performed by the agent so far, and the observations from the environment after performing the actions.
-                    Example :
-                            [
-                              {{ "type": "user", "content": "Get stock price of AAPL" }},
-                              {{ "type": "agent", "content": "Called StockPriceTool(symbol='AAPL')" }},
-                              {{ "type": "environment", "content": "StockPriceTool returned $175.20" }},
-                                ...
-                            ]
-                4. Turn Context : This is a suggestion for what to execute next. Pay attention to this, you may need to reframe the task based on this suggestion. If absent, ignore it. 
+                3. Turn Context : This contains a history of the task/query/previous-step-response given by the user, the actions (tool use, agent invocation, response generation) performed by the agent so far, and the observations from the environment after performing the actions.
+                                  It also contains `data` (or payload) which has information that can be used when generating a response.
+                4. Last Step Feedback (object or null):  
+                   A dict with:
+                   - **id**: the UUID of the last step's feedback  
+                   - **task**: the last sub‑task description  
+                   - **status**: one of "pending", "clarification", "completed", "failed"  
+                   - **reasoning**: why it succeeded/failed or what needs clarifying
 
                 ### RESOURCES:
                 
@@ -251,24 +260,32 @@ class PromptStore:
 
                 1. **Do not perform computation yourself.** Only reason with the information you have and route.
                    - You can reason step-bu-step if and when needed in order to decide where to route.
-                2. Consider **both tools and agents** for every routing request.
-                3. Choose the one that **best aligns** with the goal’s intent, inputs, and complexity.
-                4. Do **not** select both. Only pick **one** per response.
+                2. Consider actions : **tools, agents, generate_response_and_terminate**, for every routing request.
+                3. Choose the one that **best aligns** with the Task, Turn Context, and complexity of the task.
+                    a. If provided, use `Plan` as a general guideline for how to go about executing the task. You can deviate from the steps in the Plan, it only serves as a loose overarching guideline for how to execute the task. 
+                    b. Pay attention to the `Last Step Feedback` (if provided) to make more informed decisions, 
+                        For example: 
+                            1. If the task requires clarification from the user terminate the current agent run and defer the clarification request to the user
+                            2. You can reframe the task with additional information. If not, return the original `task` as the `reframed_task` value.
+                            3. Use any information from the feedback to guide your next steps. **Prioritize next step information in the feedback** over the `Plan` to determine your next step. 
+                4. Do **not** select more than one action. Only pick **one** per response.
                 5. Do not invent new tools or agents.
-                6. Given the Turn Context, you can reframe the task with additional information. If not, return the original `task` as the `reframed_task` value.
-                7. Do not call a function or agent multiple times unless there is additional information available in the task being given to the function or agent. 
-                8. Only return fields explicitly described in the format below.
-                9. Provide the following as a json output:
-                   - The type: `"agent"` or `"tool"`
-                   - The name of the selected item (agent name or tool name)
-                   - You DO NOT need to provide arguments required to invoke it (based on input goals/context)
+                6. **Given the `Turn Context`, use the `data`(if present) to generate a response. Especially if the feedback refers to using the payload(The `data` items present in `Turn Context` constitute the payload). This might contain important information needed to generate response.**
+                7. Only return fields explicitly described in the format below.
+                8. Provide the following as a json output:
+                   - The type: `"agent"`, `"tool"`, `"generate_response_and_terminate"` 
+                   - The name of the selected agent or tool, if any. In case of `"generate_response_and_terminate"`, leave this blank.
+                   - When calling a tool, you DO NOT need to provide arguments required to invoke it, only the name of the tool and `reframed_task` along with it.
+                   - When calling an agent, provide the `reframed_task` along with the name of the agent. 
                    
                    Return **only** a JSON dictionary as response like:
                     {{
                       "name": < A string type value containing either the agent name or the tool name>,
-                      "reframed_task": <A string type value for the task with new information>,
-                      "type": <"agent" or "tool">,
-                      "explanation": "...", // Explanation for route selection
+                      "reframed_task": <A string type value for the task with new information. Only fill this if `agent` or `tool` is being invoked.>,
+                      "payload_ids": <Payload ids necessary to be handed over to the next step>,
+                      "type": <"agent", "tool", "generate_response_and_terminate">,
+                      "response": <A response (detailed if necessary, follow instructions as given to you for the response type requested by the user). Only provide this when type is `"generate_response_and_terminate"`>, 
+                      "explanation": "...", // Explanation for route selection,
                       "confidence_score": 0.0  // Float value between 0.0 and 1.0 to indicate confidence in its route selection
                     }}
                 
@@ -278,10 +295,28 @@ class PromptStore:
                 
                 Task : {task}
                 Plan : {plan}
-                Memory : {memory}
+                Turn Context : {turn_context}
+                Last Step Feedback: {feedback}
                 Tools : {tools}
                 Agents : {agents}
-                Turn Context: {turn_context}
+            """,
+            
+            "agent_payload_memory_builder_instruction" : """
+                You are a memory organizer. You store large amounts of data(payload) in a memory store and generate a description so that an agent using the memory can identify which payload is most useful at a particular step.
+                Your task is to generate a concise (max. 1-3 sentences long) description of what the payload is for.
+                I will provide you with:
+                 1. The `MEMORY` of the actions(user tasks/queries/responses, tool or agent invocations, observations from the environment)
+                 2. The `INVOCATION` of a tool or agent which responded with the payload. 
+                 
+                You must return a valid JSON response containing ONLY a string type description(against the key `description`) for the payload like:
+                    ```json
+                    {{
+                      "description": <A 1-3 sentences long description for the payload>
+                    }}
+                 
+                MEMORY : {memory}
+                
+                INVOCATION : {invocation}
             """
         }
 

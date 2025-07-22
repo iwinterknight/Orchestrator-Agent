@@ -1,4 +1,5 @@
-from typing import List, Dict
+import uuid
+from typing import List, Dict, Any
 
 
 class Memory:
@@ -16,3 +17,17 @@ class Memory:
         memory = Memory()
         memory.items = filtered_items
         return memory
+
+
+class PayloadMemory:
+    def __init__(self):
+        self.items = {}
+
+    def add_payload(self, payload: Any):
+        payload_id = str(uuid.uuid4())
+        self.items[payload_id] = payload
+        return payload_id
+
+    def retrieve_payload(self, payload_id: str):
+        result = self.items.get(payload_id.strip(), None)
+        return result
