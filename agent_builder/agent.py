@@ -254,11 +254,11 @@ class Agent:
                 invoked_item = routing_response["name"]
                 invocations_counter[invoked_item] += 1
 
-                if invocations_counter[invoked_item] > 2:
-                    agent_response = self.generate_response_from_payload(task=reframed_task,
-                                                                         response=json.loads(
-                                                                             memory.get_memories()[-1]["content"]))
-                    return agent_response
+                # if invocations_counter[invoked_item] > 2:
+                #     agent_response = self.generate_response_from_payload(task=reframed_task,
+                #                                                          response=json.loads(
+                #                                                              memory.get_memories()[-1]["content"]))
+                #     return agent_response
 
                 if "type" in routing_response and routing_response["type"] == "agent":
                     scheduled_agent_name = routing_response["name"]
@@ -321,10 +321,11 @@ class Agent:
                         turn_action = json_selection_response
                         turn_observation = None
 
-                    if self.should_terminate(selection_response):
-                        agent_response = self.generate_response_from_payload(task=task,
-                                                                             response=json.loads(memory.get_memories()[-1]["content"]), content=selection_response)
-                        return agent_response
+                    # if self.should_terminate(selection_response):
+                    #     agent_response = self.generate_response_from_payload(task=task,
+                    #                                                          response=json.loads(memory.get_memories()[-1]["content"]), content=selection_response)
+                    #     return agent_response
+
             turn_feedback = feedback_builder.build_agent_feedback(task=task, action=turn_action, observation=turn_observation,
                                                   resources=self.resources)
         final_response = json.loads(memory.get_memories()[-1]["content"])

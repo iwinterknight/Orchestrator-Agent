@@ -275,8 +275,9 @@ class PromptStore:
                 6. **Given the `Turn Context`, use the `data`(if present) to generate a response. Especially if the feedback refers to using the payload(The `data` items present in `Turn Context` constitute the payload). This might contain important information needed to generate response.**
                 7. Only return fields explicitly described in the format below.
                 8. Unless asked for detail/report etc., keep your responses concise.
-                9. In general, focus on the latest items in the Turn Context. Use the Plan to help find relevant items from the Turn Context.
-                10. Provide the following as a json output:
+                9. In general, focus on the latest items in the Turn Context if uncertain which parts to focus on.
+                10. **Do not call the same tool more than twice.**
+                11. Provide the following as a json output:
                    - The type: `"agent"`, `"tool"`, `"generate_response_and_terminate"` 
                    - The name of the selected agent or tool, if any. In case of `"generate_response_and_terminate"`, leave this blank.
                    - When calling a tool, you DO NOT need to provide arguments required to invoke it, only the name of the tool and `reframed_task` along with it.

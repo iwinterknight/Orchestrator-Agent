@@ -122,24 +122,24 @@ def main():
         return sorted([file for file in os.listdir(".")
                        if file.endswith(".py")])
 
-    @chatbot_register_tool(
-        tags=["generate", "additional information"],
-    )
-    def generate_content(content: str, directions: str, payload_id: str) -> str:
-        """
-        Given 'directions', 'content' and 'payload_id'(all string types) return the generated text.
-        'payload_id' contains string type id that reference information in a memory store, to be used as context while generating content.
-        """
-        data = []
-        if payload_id:
-            data.append({
-                "payload": PAYLOAD_MEMORY.retrieve_payload(payload_id)
-            })
-        from utils.llm_api import infer_llm_generation
-        prompt = (
-            f"Directions: {directions}\nContent: {content}\nContext: {data}\n"
-        )
-        return infer_llm_generation(prompt)
+    # @chatbot_register_tool(
+    #     tags=["generate", "additional information"],
+    # )
+    # def generate_content(content: str, directions: str, payload_id: str) -> str:
+    #     """
+    #     Given 'directions', 'content' and 'payload_id'(all string types) return the generated text.
+    #     'payload_id' contains string type id that reference information in a memory store, to be used as context while generating content.
+    #     """
+    #     data = []
+    #     if payload_id:
+    #         data.append({
+    #             "payload": PAYLOAD_MEMORY.retrieve_payload(payload_id)
+    #         })
+    #     from utils.llm_api import infer_llm_generation
+    #     prompt = (
+    #         f"Directions: {directions}\nContent: {content}\nContext: {data}\n"
+    #     )
+    #     return infer_llm_generation(prompt)
 
     @chatbot_register_tool(tags=["chatbot_terminate"], terminal=True)
     def chatbot_terminate(message: str) -> str:
@@ -177,24 +177,24 @@ def main():
         result = make_fastapi_request(url, logger, method="POST", params=payload)
         return result
 
-    @news_events_register_tool(
-        tags=["generate", "additional information"],
-    )
-    def generate_content(content: str, directions: str, payload_id: str) -> str:
-        """
-        Given 'directions', 'content' and 'payload_id'(all string types) return the generated text.
-        'payload_id' contains string type id that reference information in a memory store, to be used as context while generating content.
-        """
-        data = []
-        if payload_id:
-            data.append({
-                "payload": PAYLOAD_MEMORY.retrieve_payload(payload_id)
-            })
-        from utils.llm_api import infer_llm_generation
-        prompt = (
-            f"Directions: {directions}\nContent: {content}\nContext: {data}\n"
-        )
-        return infer_llm_generation(prompt)
+    # @news_events_register_tool(
+    #     tags=["generate", "additional information"],
+    # )
+    # def generate_content(content: str, directions: str, payload_id: str) -> str:
+    #     """
+    #     Given 'directions', 'content' and 'payload_id'(all string types) return the generated text.
+    #     'payload_id' contains string type id that reference information in a memory store, to be used as context while generating content.
+    #     """
+    #     data = []
+    #     if payload_id:
+    #         data.append({
+    #             "payload": PAYLOAD_MEMORY.retrieve_payload(payload_id)
+    #         })
+    #     from utils.llm_api import infer_llm_generation
+    #     prompt = (
+    #         f"Directions: {directions}\nContent: {content}\nContext: {data}\n"
+    #     )
+    #     return infer_llm_generation(prompt)
 
     @news_events_register_tool(tags=["news_and_events_terminate"], terminal=True)
     def news_and_events_terminate(message: str) -> str:
