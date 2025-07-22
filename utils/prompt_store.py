@@ -36,7 +36,7 @@ class PromptStore:
                 3. **For each step**, include:
                    - A brief `"action"` (tool or agent invocation, with any key parameters),  
                    - A one‑sentence `"description"` explaining why or how.  
-                4. **Be concise**—no more than 5–7 steps unless absolutely necessary.  
+                4. **Be concise**—no more than 5–7 steps unless absolutely necessary. Unless asked for detail/report etc., keep the plan limited to 1-2 steps.
                 5. Return **exactly** one JSON object with two top‑level fields:
                 
                 ```json
@@ -115,11 +115,11 @@ class PromptStore:
                   "context": {{
                     "memory": JSON array of the relevant memory items for the agent's next step,
                     "previous_context": {{
-                        "user_request": "Get stock price of AAPL",
                         "content": "Previously fetched closing prices for AAPL over the past week: Jul14:$170.45; Jul 15: $172.30; Jul 16: $173.10; Jul 17: $174.00; Jul 18: $175.20. Dividend of $0.22 recorded on Jul 13. Analyst summary: AAPL is up 2.3% in the last 5 days. Historical price data cached at /data/aapl_history.csv. Last chart generated visualized the monthly trend through June. Use this context to decide whether to call the live price API or rely on cached data, and how to format the next response."
-                        "comments": "This context was assembled from the last four turns: the user requested AAPL’s stock price; the agent used PriceHistoryTool to retrieve historical closing prices; the environment returned those values; concurrently, NewsAgent fetched recent AAPL news (earnings release, dividend announcement). The summary combines both database metrics and news events to guide the next action." <This is to help the agent understand where the content is coming from and how it is relevant for the next agent action.> 
                     }}
                   }}
+                  "payload_ids": <list of payload_ids>,
+                  "comments": <a string type value indicating what the thoughts are for the next step and how the next step fits into the overall plan> 
                 }}
                 You can add more fields to the `previous_context` as and when required to provide more information / explain the items in the context etc.
                 
@@ -157,7 +157,8 @@ class PromptStore:
                 2. **status**:  
                    One of `"pending"`, `"clarification"`, `"completed"`, `"failed"`.  
                    If you get a response for the task, avoid repetitive tool use by marking the task as `completed`, `failed` or `clarification`.
-                   Only mark task as `pending` when you have sufficient evidence of significant progress that can be made by reusing the agent or tool(for example, new information acquired). 
+                   Only mark task as `pending` when you have sufficient evidence of significant progress that can be made by reusing the agent or tool(for example, new information acquired).
+                   Under any circumstances, no agent or tool should be invoked more than twice. 
                 3. **reasoning**:  
                    A brief explanation (1–2 sentences) of why you chose this status given the observation.
                 Return **only** a JSON object with these three fields.
@@ -272,7 +273,8 @@ class PromptStore:
                 5. Do not invent new tools or agents.
                 6. **Given the `Turn Context`, use the `data`(if present) to generate a response. Especially if the feedback refers to using the payload(The `data` items present in `Turn Context` constitute the payload). This might contain important information needed to generate response.**
                 7. Only return fields explicitly described in the format below.
-                8. Provide the following as a json output:
+                8. Unless asked for detail/report etc., keep your responses concise.
+                9. Provide the following as a json output:
                    - The type: `"agent"`, `"tool"`, `"generate_response_and_terminate"` 
                    - The name of the selected agent or tool, if any. In case of `"generate_response_and_terminate"`, leave this blank.
                    - When calling a tool, you DO NOT need to provide arguments required to invoke it, only the name of the tool and `reframed_task` along with it.

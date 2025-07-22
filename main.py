@@ -80,6 +80,35 @@ def main():
         """
         return fetch_people_org_response(query=query)
 
+    def fetch_news_events_response(query: str) -> str:
+        url = f'http://192.168.49.1:8020/api/search_and_recommendation'
+        # url = f'http://10.3.7.166:8020/api/search_and_recommendation'
+
+        payload = {
+            "query": query
+        }
+        result = make_fastapi_request(url, logger, method="POST", params=payload)
+        return result
+
+
+    @chatbot_register_tool(tags=["data_retrieval", "people_table", "org_table"])
+    def news_and_events_response(query: str) -> str:
+        """
+        A domain-aware information retrieval tool that searches a news repository, filters articles based on query relevance, and returns both a synthesized response and the matched articles. Ideal for surfacing recent events, identifying trends, or providing evidence-backed insights.
+
+        Args:
+            query: Query of the user
+
+        Returns:
+            Response in the following structure :
+            "response": string,
+            "excerpt": string,
+            "explanation": string,
+            "confidence": float,
+            "docs": List[string]
+        """
+        return fetch_news_events_response(query=query)
+
     @chatbot_register_tool(tags=["file_operations", "list"])
     def list_project_files() -> List[str]:
         """Lists all Python files in the current project directory.
@@ -179,38 +208,38 @@ def main():
         """
         return f"{message}\nTerminating..."
 
-    news_events_persona = "I am a focused news analysis agent. I specialize in retrieving the most relevant news articles based on your query, summarizing key developments, and presenting structured, informative responses grounded in real information."
-    news_events_description = "A domain-aware information retrieval agent that searches a news repository, filters articles based on query relevance, and returns both a synthesized response and the matched articles. Ideal for surfacing recent events, identifying trends, or providing evidence-backed insights."
-    news_events_skills = [AgentSkill(
-        id=str(uuid.uuid4()),
-        name="Fetch News and Articles",
-        description=(
-            "Handles natural language queries related to current events or recent developments. "
-            "Retrieves relevant news articles from the internal repository and generates a synthesized summary "
-            "alongside the article data. Ideal for surfacing timely insights from real-world sources."
-        ),
-        tags=["news", "events", "data retrieval", "summarization", "agent"],
-        examples=[
-            "User: What are the latest updates on AI regulation in Europe?\n→ Retrieves and summarizes top articles from the news repository.",
-            "User: Show me recent funding announcements in the biotech sector.\n→ Fetches and summarizes related articles.",
-            "User: What's trending in tech this week?\n→ Returns summarized highlights from relevant news sources."
-        ]
-    )]
-    news_events_card = AgentCard(name="news_and_events", persona=news_events_persona,
-                                 description=news_events_description,
-                                 skills=news_events_skills, version="1", url="")
-
-    news_events_agent = Agent(
-        agent_card=news_events_card,
-        agent_language=AgentFunctionCallingActionLanguage(),
-        resources=ExecutableResourceRegistry(tools_factory=news_events_tools_factory,
-                                             tags=["data_retrieval", "news_and_events", "generate", "additional information", "news_and_events_terminate"]),
-        generate_response_routing=news_events_router,
-        generate_response_tool_selection=news_events_selector,
-        generate_response=infer_llm_generation,
-        environment=Environment(),
-        payload_memory=PAYLOAD_MEMORY
-    )
+    # news_events_persona = "I am a focused news analysis agent. I specialize in retrieving the most relevant news articles based on your query, summarizing key developments, and presenting structured, informative responses grounded in real information."
+    # news_events_description = "A domain-aware information retrieval agent that searches a news repository, filters articles based on query relevance, and returns both a synthesized response and the matched articles. Ideal for surfacing recent events, identifying trends, or providing evidence-backed insights."
+    # news_events_skills = [AgentSkill(
+    #     id=str(uuid.uuid4()),
+    #     name="Fetch News and Articles",
+    #     description=(
+    #         "Handles natural language queries related to current events or recent developments. "
+    #         "Retrieves relevant news articles from the internal repository and generates a synthesized summary "
+    #         "alongside the article data. Ideal for surfacing timely insights from real-world sources."
+    #     ),
+    #     tags=["news", "events", "data retrieval", "summarization", "agent"],
+    #     examples=[
+    #         "User: What are the latest updates on AI regulation in Europe?\n→ Retrieves and summarizes top articles from the news repository.",
+    #         "User: Show me recent funding announcements in the biotech sector.\n→ Fetches and summarizes related articles.",
+    #         "User: What's trending in tech this week?\n→ Returns summarized highlights from relevant news sources."
+    #     ]
+    # )]
+    # news_events_card = AgentCard(name="news_and_events", persona=news_events_persona,
+    #                              description=news_events_description,
+    #                              skills=news_events_skills, version="1", url="")
+    #
+    # news_events_agent = Agent(
+    #     agent_card=news_events_card,
+    #     agent_language=AgentFunctionCallingActionLanguage(),
+    #     resources=ExecutableResourceRegistry(tools_factory=news_events_tools_factory,
+    #                                          tags=["data_retrieval", "news_and_events", "generate", "additional information", "news_and_events_terminate"]),
+    #     generate_response_routing=news_events_router,
+    #     generate_response_tool_selection=news_events_selector,
+    #     generate_response=infer_llm_generation,
+    #     environment=Environment(),
+    #     payload_memory=PAYLOAD_MEMORY
+    # )
 
 
     chatbot_persona = "You are a thoughtful AI coordinator. You break down user goals, recall past context, and decide whether to act directly or delegate to a specialized agent — always choosing the most effective path forward to accomplish the task, using the goals as a rough guideline."
@@ -237,7 +266,7 @@ def main():
         agent_card=chatbot_card,
         agent_language=AgentFunctionCallingActionLanguage(),
         resources=ExecutableResourceRegistry(tools_factory=chatbot_tools_factory,
-                                             agents=[news_events_agent.agent_context],
+                                             # agents=[news_events_agent.agent_context],
                                              tags=["file_operations", "generate", "chatbot_terminate", "data_retrieval"]),
         generate_response_routing=chatbot_router,
         generate_response_tool_selection=chatbot_selector,

@@ -191,10 +191,16 @@ class Agent:
         turn_feedback, turn_action, turn_observation = None, None, None
         plan = plan_builder.build_plan(task=task, resources=self.resources, memory=memory)
 
+        print(f"Plan: {plan.plan}")
+
         for _ in range(max_iterations):
-            print("Agent thinking...")
+            if turn_feedback:
+                print(f"Observation: {turn_observation}")
 
             turn_context = context_builder.build_turn_context(task=task, memory=memory, feedback=turn_feedback)
+
+            if turn_context.comments:
+                print(f"Thought: {turn_context.comments}")
             routing_prompt = self.construct_prompt_for_resource_selection(task=task, plan=plan, resources=self.resources,
                                                                           turn_context=turn_context, feedback=turn_feedback)
             routing_response = self.prompt_llm_for_routing(prompt=routing_prompt)
@@ -217,19 +223,20 @@ class Agent:
                             agent_response = infer_llm_generation(prompt)
                         else:
                             agent_response = routing_response.get("response")
-                        res_len = len(json.dumps(agent_response).split())
-                        if res_len > 100:
-                            payload_id, payload_description = self.construct_payload(memory=memory,
-                                                                                     invocation=invocation,
-                                                                                     result=agent_response)
-                            result = {
-                                "description": "Reference to the memory store where result is being stored and can be retrieved using the `payload_id`. Refer to `payload_description` for more information about the result.",
-                                "payload_id": str(payload_id),
-                                "payload_description": payload_description
-                            }
-                            self.update_memory(memory=memory, invocation=invocation, result=result)
-                        else:
-                            self.update_memory(memory=memory, result=agent_response)
+                        # res_len = len(json.dumps(agent_response).split())
+                        # if res_len > 100:
+                        #     payload_id, payload_description = self.construct_payload(memory=memory,
+                        #                                                              invocation=invocation,
+                        #                                                              result=agent_response)
+                        #     result = {
+                        #         "description": "Reference to the memory store where result is being stored and can be retrieved using the `payload_id`. Refer to `payload_description` for more information about the result.",
+                        #         "payload_id": str(payload_id),
+                        #         "payload_description": payload_description
+                        #     }
+                        #     self.update_memory(memory=memory, invocation=invocation, result=result)
+                        # else:
+                        #     self.update_memory(memory=memory, result=agent_response)
+                        self.update_memory(memory=memory, result=agent_response)
                         return agent_response
                     else:
                         print("[WARN] routing_response missing 'response'")
@@ -239,8 +246,10 @@ class Agent:
                     reframed_task = task
                 invoked_item = routing_response["name"]
                 invocations_counter[invoked_item] += 1
-                if invocations_counter[invoked_item] > 2:
-                    break
+
+                # if invocations_counter[invoked_item] > 2:
+                #     break
+
                 if "type" in routing_response and routing_response["type"] == "agent":
                     scheduled_agent_name = routing_response["name"]
                     print(f"Agent Decision: Calling agent {scheduled_agent_name}")
@@ -280,7 +289,6 @@ class Agent:
                             tool, invocation = self.get_tool(selection_response)
                             args = invocation.get("args", {})
                             result = self.environment.execute_tool(tool, args)
-                            print(f"Tool Result: {result}")
                         except Exception as e:
                             result = f"Failed to execute tool: {e}"
                         res_len = len(json.dumps(result).split())

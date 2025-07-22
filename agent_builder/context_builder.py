@@ -14,7 +14,8 @@ class TurnContext:
     task: str = ""
     context: Any = field(default=None)
     data: Any = field(default=None)
-    payload_ids = List[uuid.UUID]
+    payload_ids: List = List[str]
+    comments: Any = field(default=None)
 
 
 def normalize_context(raw: Any) -> Dict[str, Any]:
@@ -25,15 +26,16 @@ def normalize_context(raw: Any) -> Dict[str, Any]:
         task_val = d.get("task")
         context_val = d.get("context")
         payload_val = d.get("payload_ids")
+        comments = d.get("comments")
         if not isinstance(task_val, str):
             raise TypeError(f"'task' field must be a string, got {type(task_val)}: {task_val!r}")
-        return {"task": task_val, "context": context_val, "payload_ids": payload_val}
+        return {"task": task_val, "context": context_val, "payload_ids": payload_val, "comments": comments}
 
     if "task" in raw and "context" in raw and "payload_ids" in raw:
         return extract_fields(raw)
 
     for v in raw.values():
-        if isinstance(v, dict) and "task" in v and "context" in v and "payload_ids" in v:
+        if isinstance(v, dict) and "task" in v and "context" in v and "payload_ids" in v and "comments" in v:
             return extract_fields(v)
 
     raise ValueError(f"Could not normalize turn context from LLM output: {raw!r}")
@@ -89,6 +91,8 @@ class ContextBuilder:
             id=self.turn_context.id,
             task=parsed_turn_context["task"],
             context=parsed_turn_context["context"],
+            payload_ids=payload_ids,
+            comments=parsed_turn_context.get("comments", ""),
             data=data if data else None
         )
 
