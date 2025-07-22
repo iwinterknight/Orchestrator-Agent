@@ -208,16 +208,18 @@ class Agent:
         turn_feedback, turn_action, turn_observation = None, None, None
         plan = plan_builder.build_plan(task=task, resources=self.resources, memory=memory)
 
-        print(f"Plan: {plan.plan}")
+        VIOLET = "\033[38;5;93m"  # try 93, 129, or 135 for different violets
+        RESET = "\033[0m"
+        print(f"{VIOLET}Plan: {plan.plan}{RESET}")
 
         for iteration in range(max_iterations):
             if turn_feedback:
-                print(f"Observation: {turn_feedback.reasoning}")
+                print(f"\033[33mObservation: {turn_feedback.reasoning}\033[0m")
 
             turn_context = context_builder.build_turn_context(task=task, memory=memory, feedback=turn_feedback)
 
             if turn_context.comments:
-                print(f"Thought: {turn_context.comments}")
+                print(f"\033[34mThought: {turn_context.comments}\033[0m")
             routing_prompt = self.construct_prompt_for_resource_selection(task=task, plan=plan, resources=self.resources,
                                                                           turn_context=turn_context, feedback=turn_feedback)
             routing_response = self.prompt_llm_for_routing(prompt=routing_prompt)
@@ -291,7 +293,9 @@ class Agent:
 
                     routing_prompt.task = reframed_task
                     selection_response = self.prompt_llm_for_tool_selection(routing_prompt)
-                    print(f"Agent Decision: {selection_response}")
+
+                    GREEN = "\033[92m"
+                    print(f"{GREEN}Agent Decision: {selection_response}{RESET}")
 
                     if "tool" in selection_response:
                         invocation = None

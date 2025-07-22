@@ -68,6 +68,26 @@ def main():
         with open(name, "r") as f:
             return f.read()
 
+    @chatbot_register_tool(tags=["web_search", "data_retrieval"])
+    def web_search_response(query: str) -> str:
+        """Queries the web and returns a response.
+
+        Args:
+            query: Query of the user
+
+        Returns:
+            Response as a string
+        """
+        from openai import OpenAI
+        client = OpenAI()
+
+        resp = client.responses.create(
+            model="gpt-4o",
+            input=query,
+            tools=[{"type": "web_search"}]
+        )
+        return resp.output_text
+
     @chatbot_register_tool(tags=["data_retrieval", "people_table", "org_table"])
     def people_org_response(query: str) -> str:
         """Queries the People and Organization data repository and returns a response.
@@ -251,7 +271,7 @@ def main():
             "Interprets natural language user input and determines whether to call a tool "
             "or delegate to a specialized agent. Uses goals, memory, and context to select the best next action."
         ),
-        tags=["chatbot", "orchestration", "routing", "llm", "function-calling", "generate", "additional information"],
+        tags=["chatbot", "orchestration", "routing", "llm", "function-calling", "generate", "additional information", "web_search"],
         examples=[
             "User: What files are in the directory?\n→ Action: list_project_files",
             "User: Summarize key org changes.\n→ Action: people_org_response",
@@ -282,14 +302,17 @@ def main():
 
     memory = Memory()
 
+    RED = "\033[31m"
+    RESET = "\033[0m"
+    GREEN = "\n\033[32m"
     while True:
-        print("=== Question ===")
+        print(f"{RED}=== Question ==={RESET}")
         query = input(">>> ")
         if query.lower() == "exit":
             break
         final_response = chat_agent.run(query, memory=memory)
         # final_response = json.loads(final_memory.get_memories()[-1]["content"])["result"]
-        print("\n=== RESPONSE ===:\n", final_response)
+        print(f"{GREEN}=== RESPONSE ===:{RESET}", f"{GREEN}final_response{RESET}")
 
 
 if __name__ == "__main__":
