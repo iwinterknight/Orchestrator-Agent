@@ -303,8 +303,8 @@ class Agent:
                         turn_action = json_selection_response
                         turn_observation = None
 
-                    if self.should_terminate(selection_response):
-                        break
+                    # if self.should_terminate(selection_response):
+                    #     break
             turn_feedback = feedback_builder.build_agent_feedback(task=task, action=turn_action, observation=turn_observation,
                                                   resources=self.resources)
         final_response = json.loads(memory.get_memories()[-1]["content"])

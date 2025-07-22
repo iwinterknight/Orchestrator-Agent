@@ -157,7 +157,7 @@ class PromptStore:
                 2. **status**:  
                    One of `"pending"`, `"clarification"`, `"completed"`, `"failed"`.  
                    If you get a response for the task, avoid repetitive tool use by marking the task as `completed`, `failed` or `clarification`.
-                   Only mark task as `pending` when you have sufficient evidence of significant progress that can be made by reusing the agent or tool. 
+                   Only mark task as `pending` when you have sufficient evidence of significant progress that can be made by reusing the agent or tool(for example, new information acquired). 
                 3. **reasoning**:  
                    A brief explanation (1–2 sentences) of why you chose this status given the observation.
                 Return **only** a JSON object with these three fields.
@@ -259,13 +259,13 @@ class PromptStore:
                 ### DECISION & RESPONSE RULES:
 
                 1. **Do not perform computation yourself.** Only reason with the information you have and route.
-                   - You can reason step-bu-step if and when needed in order to decide where to route.
+                   - You can reason step-by-step if and when needed in order to decide where to route.
                 2. Consider actions : **tools, agents, generate_response_and_terminate**, for every routing request.
                 3. Choose the one that **best aligns** with the Task, Turn Context, and complexity of the task.
                     a. If provided, use `Plan` as a general guideline for how to go about executing the task. You can deviate from the steps in the Plan, it only serves as a loose overarching guideline for how to execute the task. 
                     b. Pay attention to the `Last Step Feedback` (if provided) to make more informed decisions, 
                         For example: 
-                            1. If the task requires clarification from the user terminate the current agent run and defer the clarification request to the user
+                            1. If the task requires clarification from the user terminate the current agent run and defer the clarification request to the user.
                             2. You can reframe the task with additional information. If not, return the original `task` as the `reframed_task` value.
                             3. Use any information from the feedback to guide your next steps. **Prioritize next step information in the feedback** over the `Plan` to determine your next step. 
                 4. Do **not** select more than one action. Only pick **one** per response.
