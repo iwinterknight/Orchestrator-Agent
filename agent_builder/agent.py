@@ -133,7 +133,7 @@ class Agent:
         if "response" in response:
             payload_ids = response["response"]["payload_ids"]
         else:
-            payload_ids = response["payload_ids"]
+            payload_ids = response["payload_id"]
         for payload_id in payload_ids:
             data.append({
                 "payload_id": payload_id,
