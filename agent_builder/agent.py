@@ -208,9 +208,9 @@ class Agent:
         turn_feedback, turn_action, turn_observation = None, None, None
         plan = plan_builder.build_plan(task=task, resources=self.resources, memory=memory)
 
-        VIOLET = "\033[38;5;93m"  # try 93, 129, or 135 for different violets
+        BLUE = "\033[94m"
         RESET = "\033[0m"
-        print(f"{VIOLET}Plan: {plan.plan}{RESET}")
+        print(f"{BLUE}Plan: {plan.plan}{RESET}")
 
         for iteration in range(max_iterations):
             if turn_feedback:
