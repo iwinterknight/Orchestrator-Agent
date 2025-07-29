@@ -7,9 +7,8 @@ from openai import OpenAI
 from agent_builder.tools_factory import ToolsFactory
 from utils.prompt_store import PromptStore
 
-# os.environ["OPENAI_API_KEY"] = "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"
 os.environ[
-    "OPENAI_API_KEY"] = "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"
+    "OPENAI_API_KEY"] = "********"
 
 client = OpenAI(
     api_key=os.environ.get("OPENAI_API_KEY")
